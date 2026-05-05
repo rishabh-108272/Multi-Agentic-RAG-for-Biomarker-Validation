@@ -17,7 +17,7 @@ export default function Layout({ children }: LayoutProps) {
             <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
               <Dna size={16} className="text-cyan-400" />
             </div>
-            <span className="font-semibold text-sm text-gray-200 tracking-wide">GeneExpressionPipeline</span>
+            <span className="font-semibold text-sm text-gray-200 tracking-wide">Gene Expression Pipeline</span>
           </Link>
 
           <nav className="flex items-center gap-1">

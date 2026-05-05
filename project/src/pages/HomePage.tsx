@@ -17,6 +17,21 @@ const statusStyles: Record<string, string> = {
   error: 'bg-red-500/10 text-red-400 border-red-500/20',
 };
 
+// Map every known subtype to a color style.
+// Lung subtypes (LUAD, LUSC, SCLC) → cyan family
+// Colorectal subtypes (COAD, READ) → orange family
+// Unknown/other → gray fallback
+function getSubtypeStyle(subtype: string): string {
+  const s = subtype.toUpperCase();
+  if (['LUAD', 'LUSC'].includes(s)) {
+    return 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
+  }
+  if (['COAD', 'READ'].includes(s)) {
+    return 'bg-orange-500/10 text-orange-400 border border-orange-500/20';
+  }
+  return 'bg-gray-700/50 text-gray-400 border border-gray-600';
+}
+
 export default function HomePage() {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
@@ -42,15 +57,39 @@ export default function HomePage() {
   const loadRecent = async () => {
     try {
       const data = await api.recent();
-      setRecentAnalyses(
-        data.map((item) => ({
-          id: String(item.id || ''),
-          patient_id: String(item.patient_id || 'N/A'),
-          predicted_subtype: (item.predicted_subtype as string | null) || null,
-          status: String(item.status || 'pending'),
-          created_at: String(item.created_at || new Date().toISOString()),
-        }))
+
+      const mapped = data.map((item) => ({
+        id: String(item.id || ''),
+        patient_id: String(item.patient_id || 'N/A'),
+        // Prefer the subtype from the full results if the item is complete,
+        // falling back to predicted_subtype from the summary row.
+        predicted_subtype:
+          (item.results as { subtype?: string } | undefined)?.subtype ||
+          (item.predicted_subtype as string | null) ||
+          null,
+        status: String(item.status || 'pending'),
+        created_at: String(item.created_at || new Date().toISOString()),
+      }));
+
+      // For completed analyses that still show a mismatched subtype, fetch
+      // the full result in parallel so the table reflects the final report.
+      const resolved = await Promise.all(
+        mapped.map(async (row) => {
+          if (row.status !== 'complete') return row;
+          try {
+            const full = await api.results(row.id);
+            const finalSubtype =
+              (full as { results?: { subtype?: string } })?.results?.subtype ||
+              (full as { subtype?: string })?.subtype ||
+              row.predicted_subtype;
+            return { ...row, predicted_subtype: finalSubtype || row.predicted_subtype };
+          } catch {
+            return row;
+          }
+        })
       );
+
+      setRecentAnalyses(resolved);
     } catch (err) {
       console.error(err);
       setRecentAnalyses([]);
@@ -249,11 +288,7 @@ export default function HomePage() {
                     </td>
                     <td className="px-6 py-4">
                       {a.predicted_subtype ? (
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
-                          a.predicted_subtype === 'LUAD'
-                            ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-                            : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                        }`}>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${getSubtypeStyle(a.predicted_subtype)}`}>
                           {a.predicted_subtype}
                         </span>
                       ) : (
