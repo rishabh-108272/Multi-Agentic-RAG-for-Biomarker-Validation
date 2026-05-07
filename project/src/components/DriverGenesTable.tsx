@@ -5,20 +5,6 @@ interface DriverGenesTableProps {
   genes: DriverGene[];
 }
 
-function ConfidenceBar({ value }: { value: number }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-cyan-500 rounded-full transition-all duration-700"
-          style={{ width: `${value * 100}%` }}
-        />
-      </div>
-      <span className="text-xs text-gray-400 w-10 text-right">{(value * 100).toFixed(0)}%</span>
-    </div>
-  );
-}
-
 function SHAPCell({ value }: { value: number }) {
   const abs = Math.abs(value);
   const positive = value >= 0;
@@ -50,8 +36,6 @@ export default function DriverGenesTable({ genes }: DriverGenesTableProps) {
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Gene Index</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Symbol</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">SHAP</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">LIME</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-36">Confidence</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Direction</th>
             </tr>
           </thead>
@@ -64,12 +48,6 @@ export default function DriverGenesTable({ genes }: DriverGenesTableProps) {
                 </td>
                 <td className="px-6 py-3.5 min-w-32">
                   <SHAPCell value={gene.shap} />
-                </td>
-                <td className="px-6 py-3.5 min-w-32">
-                  <SHAPCell value={gene.lime} />
-                </td>
-                <td className="px-6 py-3.5 min-w-36">
-                  <ConfidenceBar value={gene.confidence} />
                 </td>
                 <td className="px-6 py-3.5">
                   <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
