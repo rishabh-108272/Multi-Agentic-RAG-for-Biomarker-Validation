@@ -66,8 +66,8 @@ Each analysis run follows these stages:
 - Gunicorn
 - Channels
 - NumPy / Pandas / Scikit-learn
-- SHAP / LIME
-- LangChain / LangGraph
+- SHAP 
+- LangGraph
 
 ### External Services
 - Hugging Face Spaces endpoints (classification)
