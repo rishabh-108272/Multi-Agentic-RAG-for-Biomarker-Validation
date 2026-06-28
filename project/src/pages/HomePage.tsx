@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, ArrowRight, Dna, Eye } from 'lucide-react';
+import { Activity, ArrowRight, Dna, Eye, FileSpreadsheet, Loader2 } from 'lucide-react';
 import UploadBox from '../components/UploadBox';
 import { api } from '../lib/api';
 
@@ -54,6 +54,94 @@ export default function HomePage() {
     created_at: string;
   }>>([]);
 
+  const [selectedExample, setSelectedExample] = useState<string>('');
+  const [loadingExample, setLoadingExample] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<{
+    headers: string[];
+    rows: string[][];
+    totalRows: number;
+    totalCols: number;
+  } | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setCsvPreview(null);
+      setPreviewError(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+        if (lines.length === 0) {
+          setCsvPreview(null);
+          setPreviewError('The selected CSV file is empty.');
+          return;
+        }
+
+        const allRows = lines.map(line => {
+          return line.split(',').map(cell => cell.replace(/^["']|["']$/g, '').trim());
+        });
+
+        const totalRows = allRows.length;
+        const totalCols = allRows[0]?.length || 0;
+
+        // Extract first 10 columns and 10 rows for display
+        const headers = allRows[0].slice(0, 10);
+        const rows = allRows.slice(1, 11).map(row => row.slice(0, 10));
+
+        setCsvPreview({
+          headers,
+          rows,
+          totalRows,
+          totalCols,
+        });
+        setPreviewError(null);
+      } catch (err) {
+        console.error('Error parsing CSV preview:', err);
+        setPreviewError('Failed to parse CSV file for preview.');
+        setCsvPreview(null);
+      }
+    };
+    reader.onerror = () => {
+      setPreviewError('Failed to read CSV file.');
+      setCsvPreview(null);
+    };
+    reader.readAsText(file);
+  }, [file]);
+
+  const handleExampleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setSelectedExample(val);
+    if (!val) {
+      setFile(null);
+      return;
+    }
+    
+    setLoadingExample(true);
+    try {
+      const fileName = val === 'lung' ? 'test1_patient.csv' : 'patient2_with_metadata_0_COAD.csv';
+      const displayName = val === 'lung' ? 'lung_cancer_patient_gene.csv' : 'colorectal_cancer_patient_gene.csv';
+      
+      const res = await fetch(`/${fileName}`);
+      if (!res.ok) throw new Error(`Failed to fetch ${fileName}`);
+      const text = await res.text();
+      
+      const exampleFile = new File([text], displayName, { type: 'text/csv' });
+      setFile(exampleFile);
+      setClassifierType(val as 'lung' | 'colorectal');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load example file: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setSelectedExample('');
+    } finally {
+      setLoadingExample(false);
+    }
+  };
+
   const loadRecent = async () => {
     try {
       const data = await api.recent();
@@ -96,8 +184,9 @@ export default function HomePage() {
     }
   };
 
-  const handleFile = (f: File) => {
+  const handleFile = (f: File | null) => {
     setFile(f);
+    setSelectedExample('');
   };
 
   const handleAnalyze = async () => {
@@ -183,22 +272,117 @@ export default function HomePage() {
 
         {/* Upload section */}
         <div className="max-w-2xl mx-auto space-y-6">
-          <div className="text-left">
-            <label htmlFor="classifierType" className="block text-sm font-medium text-gray-300 mb-2">
-              Classifier
-            </label>
-            <select
-              id="classifierType"
-              value={classifierType}
-              onChange={(e) => setClassifierType(e.target.value as 'lung' | 'colorectal')}
-              className="w-full rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-            >
-              <option value="lung">Lung Classifier</option>
-              <option value="colorectal">Colorectal Classifier</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+            <div>
+              <label htmlFor="classifierType" className="block text-sm font-medium text-gray-300 mb-2">
+                Classifier
+              </label>
+              <select
+                id="classifierType"
+                value={classifierType}
+                onChange={(e) => setClassifierType(e.target.value as 'lung' | 'colorectal')}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              >
+                <option value="lung">Lung Classifier</option>
+                <option value="colorectal">Colorectal Classifier</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="exampleFile" className="block text-sm font-medium text-gray-300 mb-2">
+                Example Patient File
+              </label>
+              <div className="relative">
+                <select
+                  id="exampleFile"
+                  value={selectedExample}
+                  onChange={handleExampleChange}
+                  disabled={loadingExample}
+                  className="w-full rounded-xl border border-gray-700 bg-gray-900/80 px-4 py-3 text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none disabled:opacity-50"
+                >
+                  <option value="">-- Select Example CSV --</option>
+                  <option value="lung">lung_cancer_patient_gene.csv</option>
+                  <option value="colorectal">colorectal_cancer_patient_gene.csv</option>
+                </select>
+                {loadingExample && (
+                  <div className="absolute right-3 top-3.5">
+                    <Loader2 size={16} className="text-cyan-400 animate-spin" />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <UploadBox onFile={handleFile} />
+          <UploadBox file={file} onFile={handleFile} />
+
+          {/* CSV Live Preview Panel */}
+          {file && csvPreview && (
+            <div className="border border-gray-800 rounded-2xl p-6 bg-gray-900/40 backdrop-blur-sm space-y-4 text-left">
+              <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <FileSpreadsheet className="text-cyan-400" size={20} />
+                  <h3 className="font-semibold text-gray-100">Patient CSV Data Preview</h3>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-xs font-semibold px-2 py-0.5 bg-gray-800 text-gray-400 border border-gray-700 rounded-md">
+                    Rows: {csvPreview.totalRows.toLocaleString()}
+                  </span>
+                  <span className="text-xs font-semibold px-2 py-0.5 bg-gray-800 text-gray-400 border border-gray-700 rounded-md">
+                    Columns: {csvPreview.totalCols.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {previewError ? (
+                <p className="text-sm text-red-400">{previewError}</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto rounded-xl border border-gray-800 max-h-72 overflow-y-auto scrollbar-thin">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-950/80 sticky top-0 backdrop-blur">
+                        <tr className="border-b border-gray-800">
+                          {csvPreview.headers.map((h, i) => (
+                            <th
+                              key={i}
+                              className="px-4 py-2 text-left font-semibold text-gray-400 border-r border-gray-800 last:border-r-0"
+                            >
+                              {h || `Column ${i + 1}`}
+                            </th>
+                          ))}
+                          {csvPreview.totalCols > 10 && (
+                            <th className="px-4 py-2 text-left font-semibold text-gray-500 italic bg-gray-950/40">
+                              ... {csvPreview.totalCols - 10} more cols
+                            </th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800/40">
+                        {csvPreview.rows.map((row, rowIndex) => (
+                          <tr key={rowIndex} className="hover:bg-gray-800/20 transition-colors">
+                            {row.map((cell, cellIndex) => (
+                              <td
+                                key={cellIndex}
+                                className="px-4 py-2 font-mono text-gray-300 border-r border-gray-800/40 last:border-r-0 break-all"
+                              >
+                                {cell}
+                              </td>
+                            ))}
+                            {csvPreview.totalCols > 10 && (
+                              <td className="px-4 py-2 text-gray-600 bg-gray-900/10 italic">...</td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <p className="text-xs text-gray-500 text-center italic">
+                    Showing first {Math.min(csvPreview.totalRows - 1, 10)} data rows and {Math.min(csvPreview.totalCols, 10)} columns for performance.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             onClick={handleAnalyze}

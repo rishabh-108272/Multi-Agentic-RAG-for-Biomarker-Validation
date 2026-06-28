@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { Upload, FileText, X, AlertCircle } from 'lucide-react';
 
 interface FileInfo {
@@ -8,7 +8,8 @@ interface FileInfo {
 }
 
 interface UploadBoxProps {
-  onFile: (file: File) => void;
+  file: File | null;
+  onFile: (file: File | null) => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -24,12 +25,36 @@ function extractPatientId(text: string): string {
   return firstDataRow[0]?.replace(/"/g, '').trim() || 'UNKNOWN';
 }
 
-export default function UploadBox({ onFile }: UploadBoxProps) {
+export default function UploadBox({ file, onFile }: UploadBoxProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+
+  useEffect(() => {
+    if (!file) {
+      setFileInfo(null);
+      setError(null);
+      return;
+    }
+
+    if (!fileInfo || fileInfo.name !== file.name || fileInfo.size !== file.size) {
+      setReading(true);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        const patientId = extractPatientId(text);
+        setFileInfo({ name: file.name, size: file.size, patientId });
+        setReading(false);
+      };
+      reader.onerror = () => {
+        setError('Failed to read file');
+        setReading(false);
+      };
+      reader.readAsText(file.slice(0, 4096));
+    }
+  }, [file, fileInfo]);
 
   const processFile = useCallback((file: File) => {
     if (!file.name.endsWith('.csv')) {
@@ -37,20 +62,7 @@ export default function UploadBox({ onFile }: UploadBoxProps) {
       return;
     }
     setError(null);
-    setReading(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const patientId = extractPatientId(text);
-      setFileInfo({ name: file.name, size: file.size, patientId });
-      setReading(false);
-      onFile(file);
-    };
-    reader.onerror = () => {
-      setError('Failed to read file');
-      setReading(false);
-    };
-    reader.readAsText(file.slice(0, 4096));
+    onFile(file);
   }, [onFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -69,6 +81,7 @@ export default function UploadBox({ onFile }: UploadBoxProps) {
     setFileInfo(null);
     setError(null);
     if (inputRef.current) inputRef.current.value = '';
+    onFile(null);
   };
 
   return (
@@ -79,11 +92,10 @@ export default function UploadBox({ onFile }: UploadBoxProps) {
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 ${
-            dragging
-              ? 'border-cyan-400 bg-cyan-500/10 scale-[1.01]'
-              : 'border-gray-700 bg-gray-900/40 hover:border-gray-600 hover:bg-gray-900/60'
-          }`}
+          className={`relative border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 ${dragging
+            ? 'border-cyan-400 bg-cyan-500/10 scale-[1.01]'
+            : 'border-gray-700 bg-gray-900/40 hover:border-gray-600 hover:bg-gray-900/60'
+            }`}
         >
           <input
             ref={inputRef}
@@ -92,9 +104,8 @@ export default function UploadBox({ onFile }: UploadBoxProps) {
             className="hidden"
             onChange={handleChange}
           />
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 transition-colors ${
-            dragging ? 'bg-cyan-500/20' : 'bg-gray-800'
-          }`}>
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 transition-colors ${dragging ? 'bg-cyan-500/20' : 'bg-gray-800'
+            }`}>
             <Upload size={28} className={dragging ? 'text-cyan-400' : 'text-gray-400'} />
           </div>
           <p className="text-gray-200 font-medium text-lg mb-1">

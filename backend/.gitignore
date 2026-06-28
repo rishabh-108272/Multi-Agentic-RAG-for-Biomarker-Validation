@@ -1,5 +1,7 @@
 db.sqlite3
 *.sqlite3
 .wsgi_migrate.lock
-venv/
+.venv/
 .env
+lung_cancer_api/__pycache__/
+pipeline/__pycache__/

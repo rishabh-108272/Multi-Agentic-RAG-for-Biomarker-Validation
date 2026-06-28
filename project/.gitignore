@@ -21,3 +21,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.venv/
+backend/lung_cancer_api/__pycache__/
+backend/pipeline/__pycache__/

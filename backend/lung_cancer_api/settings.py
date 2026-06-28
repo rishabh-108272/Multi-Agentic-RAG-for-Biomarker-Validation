@@ -1,7 +1,7 @@
 import os 
 from pathlib import Path
 from dotenv import load_dotenv 
-
+from celery.schedules import crontab 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -189,3 +189,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CELERY_BEAT_SCHEDULE={
+    'ping-hf-spaces-every-hour': {
+        'task': 
+        'pipeline.tasks.ping_huggingface_spaces',
+        'schedule': crontab(minute=0, hour='*/1'),
+    },
+}

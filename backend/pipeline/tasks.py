@@ -5,6 +5,7 @@ from celery import shared_task
 from django.utils import timezone
 import os
 import concurrent.futures
+import requests
 
 from .models import (
     PatientAnalysis,
@@ -19,6 +20,19 @@ from .xai_engine import XAIEngine
 from .gene_mapper import GeneMapper
 from .drug_engine import DrugRepurposingEngine
 
+@shared_task
+def ping_huggingface_spaces():
+    urls=[
+       "https://rishabh108272-lung-cancer-subtype.hf.space/",
+        "https://saurav554-colorectal-cancer-subtype.hf.space/" 
+    ]
+
+    for url in urls:
+        try:
+            response=requests.get(url,timeout=15)
+            print(f"Pinged {url}-Status Code:{response.status_code}")
+        except Exception as e:
+            print(f"Error Pinging {url}: {e}")
 
 @shared_task
 def run_full_pipeline(analysis_id, csv_data, classifier_type="lung"):
